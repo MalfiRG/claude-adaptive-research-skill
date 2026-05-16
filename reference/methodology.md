@@ -1,14 +1,34 @@
-# Deep Research Methodology: 8-Phase Pipeline
+# Deep Research Methodology v3: Multi-Agent Fan-Out Pipeline
 
-## Overview
+## Architecture Overview
 
-This document contains the detailed methodology for conducting deep research. The 8 phases represent a comprehensive approach to gathering, verifying, and synthesizing information from multiple sources.
+```
+Lead Orchestrator (this context)
+    |
+    +-- Phase 1: SCOPE (define boundaries)
+    +-- Phase 2: CLASSIFY (query type -> agent count)
+    +-- Phase 2.5: DECOMPOSE (non-overlapping sub-questions + briefs)
+    +-- Phase 3: FAN-OUT (spawn N agents in parallel)
+    |       |-- Agent 1: Sub-question A (5-15 searches)
+    |       |-- Agent 2: Sub-question B (5-15 searches)
+    |       |-- Agent 3: Sub-question C (5-15 searches)
+    |       +-- Agent N: Sub-question N (5-15 searches)
+    +-- Phase 3.5: FAN-IN (collect + identify gaps + optional follow-up)
+    +-- Phase 4: TRIANGULATE (cross-verify across agent reports)
+    +-- Phase 4.5: OUTLINE REFINEMENT (adapt structure to evidence)
+    +-- Phase 5: SYNTHESIZE (connect insights, generate frameworks)
+    +-- Phase 6: CRITIQUE (red-team the analysis)
+    +-- Phase 7: REFINE (fill gaps from critique)
+    +-- Phase 8: PACKAGE (final report)
+```
+
+**CRITICAL CONSTRAINT:** In Phases 2.5-3.5, the lead orchestrator MUST NOT call WebSearch or WebFetch. All information gathering is delegated to subagents via the `Agent` tool. If you find yourself reaching for WebSearch during these phases, STOP and write an Agent brief instead. The only exception is Quick mode, where the lead MAY search directly.
 
 ---
 
 ## Phase 1: SCOPE - Research Framing
 
-**Objective:** Define research boundaries and success criteria
+**Objective:** Define research boundaries and success criteria.
 
 **Activities:**
 1. Decompose the question into core components
@@ -16,401 +36,415 @@ This document contains the detailed methodology for conducting deep research. Th
 3. Define scope boundaries (what's in/out)
 4. Establish success criteria
 5. List key assumptions to validate
+6. Get the current date: `date +%Y-%m-%d` (use for all recency filtering)
 
-**Ultrathink Application:** Use extended reasoning to explore multiple framings of the question before committing to scope.
-
-**Output:** Structured scope document with research boundaries
-
----
-
-## Phase 2: PLAN - Strategy Formulation
-
-**Objective:** Create an intelligent research roadmap
-
-**Activities:**
-1. Identify primary and secondary sources
-2. Map knowledge dependencies (what must be understood first)
-3. Create search query strategy with variants
-4. Plan triangulation approach
-5. Estimate time/effort per phase
-6. Define quality gates
-
-**Graph-of-Thoughts:** Branch into multiple potential research paths, then converge on optimal strategy.
-
-**Output:** Research plan with prioritized investigation paths
+**Output:** Structured scope document with research boundaries.
 
 ---
 
-## Phase 3: RETRIEVE - Parallel Information Gathering
+## Phase 2: CLASSIFY - Query Type Determination
 
-**Objective:** Systematically collect information from multiple sources using parallel execution for maximum speed
+**Objective:** Determine query type and agent count.
 
-**CRITICAL: Execute ALL searches in parallel using a single message with multiple tool calls**
+Explicitly reason about which category fits:
 
-### Query Decomposition Strategy
+### Query Types
 
-Before launching searches, decompose the research question into 5-10 independent search angles:
+**Depth-first query** - Multiple perspectives on the SAME issue:
+- Parallel agents exploring different viewpoints, methodologies, or source types
+- Example: "What are the most effective approaches to microservice testing?"
+- Agent strategy: Each agent researches from a different methodological angle
 
-1. **Core topic (semantic search)** - Meaning-based exploration of main concept
-2. **Technical details (keyword search)** - Specific terms, APIs, implementations
-3. **Recent developments (date-filtered)** - What's new in last 12-18 months (use current date from Step 0)
-4. **Academic sources (domain-specific)** - Papers, research, formal analysis
-5. **Alternative perspectives (comparison)** - Competing approaches, criticisms
-6. **Statistical/data sources** - Quantitative evidence, metrics, benchmarks
-7. **Industry analysis** - Commercial applications, market trends
-8. **Critical analysis/limitations** - Known problems, failure modes, edge cases
+**Breadth-first query** - Problem broken into DISTINCT independent sub-questions:
+- Parallel agents handling separate sub-topics that together form the answer
+- Example: "Compare the economic systems of three Nordic countries"
+- Agent strategy: Each agent owns one sub-topic completely
 
-### Parallel Execution Protocol
+**Straightforward query** - Focused, well-defined, needs only depth not breadth:
+- Single focused investigation, possibly with 1-2 agents for verification
+- Example: "What is the current state of WebAssembly adoption?"
+- Agent strategy: 1-2 agents with clear scope
 
-**Step 0: Get the current date**
+### Agent Count Decision
 
-Before ANY searches, retrieve today's date using Bash: `date +%Y-%m-%d`
-Use the returned year for all date-filtered queries and recency checks. Do NOT assume a year from training data.
+| Query Complexity | Agent Count | Token Multiplier |
+|---|---|---|
+| Straightforward / Quick mode | 1-2 | ~4x |
+| Standard depth or breadth | 3-5 | ~10x |
+| Multi-faceted, high-stakes | 5-8 | ~15x |
+| Comprehensive, many distinct components | 8-15 | ~20x |
 
-**Step 1: Launch ALL searches concurrently (single message)**
+**IMPORTANT:** Never spawn more than 15 agents. If a task seems to need more, restructure - consolidate similar sub-topics into fewer, broader briefs.
 
-**CRITICAL: Use correct tool and parameters to avoid errors**
+**Output:** Query type classification + target agent count + reasoning.
 
-Choose ONE search approach per research session:
+---
 
-**Option A: Use WebSearch (built-in, no MCP required)**
-- Standard web search with simple query string
-- Parameters: `query` (required)
-- Optional: `allowed_domains`, `blocked_domains`
-- Example: `WebSearch(query="quantum computing 2025")`
+## Phase 2.5: DECOMPOSE - Sub-Question Generation & Agent Briefing
 
-**Option B: Use Exa MCP (if available, more powerful)**
-- Advanced semantic + keyword search
-- Tool name: `mcp__Exa__exa_search`
-- Parameters: `query` (required), `type` (auto/neural/keyword), `num_results`, `start_published_date`, `include_domains`
-- Example: `mcp__Exa__exa_search(query="quantum computing", type="neural", num_results=10)`
+**Objective:** Produce N non-overlapping sub-questions, each with a complete agent brief.
 
-**Option C: Use search-cli (if installed, multi-provider)**
-- Unified CLI aggregating Brave, Serper, Exa, Jina, and Firecrawl
-- Install: `brew tap 199-biotechnologies/tap && brew install search-cli`
-- Requires API keys: `search config set keys.[provider] YOUR_KEY`
-- Auto-detects best provider per query type (academic, news, general, people)
-- JSON output for structured processing: `search "query" --json`
-- Modes: general, news, academic, scholar, patents, people, images, extract, scrape
-- Example: `search "quantum computing 2025" -m academic --json -c 15`
-- **First-time setup:** Ask user if they want to install search-cli and configure API keys
+This is the LOAD-BEARING phase. Fan-out without specific briefs = same duplication problem with more agents.
 
+### Decomposition Rules
 
-**NEVER mix parameter styles** - this causes "Invalid tool parameters" errors.
+1. **Non-overlapping:** Each sub-question must cover territory NO other sub-question covers. If two agents would search the same keywords, merge them or redraw boundaries.
+2. **Collectively exhaustive:** The union of all sub-questions must fully cover the original research question.
+3. **Independently answerable:** Each sub-question can be researched without results from other agents.
+4. **Appropriately scoped:** Each should need 5-15 tool calls to answer well.
 
-**Step 2: Spawn parallel deep-dive agents**
+### Agent Brief Template (6 Components - ALL REQUIRED)
 
-Use Task tool with general-purpose agents (3-5 agents) for:
-- Academic paper analysis (PDFs, detailed extraction)
-- Documentation deep dives (technical specs, API docs)
-- Repository analysis (code examples, implementations)
-- Specialized domain research (requires multi-step investigation)
+For each subagent, produce a brief with ALL six components:
 
-**Sub-agent output format:** Require all sub-agents to return structured evidence, not free text:
-```json
-{"claim": "specific claim text", "evidence_quote": "exact quote from source", "source_url": "https://...", "source_title": "...", "confidence": 0.85}
 ```
-This prevents synthesis fatigue when merging results from 3-5 agents.
+1. OBJECTIVE: [One clear research question - what this agent must answer]
 
-**Example parallel execution (using WebSearch):**
-```
-[Single message with multiple tool calls]
-- WebSearch(query="quantum computing 2025 state of the art")
-- WebSearch(query="quantum computing limitations challenges")
-- WebSearch(query="quantum computing commercial applications [CURRENT_YEAR]")
-- WebSearch(query="quantum computing vs classical comparison")
-- WebSearch(query="quantum error correction research", allowed_domains=["arxiv.org", "scholar.google.com"])
-- Task(subagent_type="general-purpose", description="Analyze quantum computing papers", prompt="Deep dive into quantum computing academic papers from [CURRENT_YEAR], extract key findings and methodologies")
-- Task(subagent_type="general-purpose", description="Industry analysis", prompt="Analyze quantum computing industry reports and market data, identify commercial applications")
-- Task(subagent_type="general-purpose", description="Technical challenges", prompt="Extract technical limitations and challenges from quantum computing research")
+2. OUTPUT FORMAT: [What the report should contain and how to structure it.
+   Default: "Dense prose report with inline citations. Flag any speculative
+   claims. Include exact quotes from key sources. End with a 'Key Findings'
+   bullet list (max 10 items)."]
+
+3. BACKGROUND CONTEXT: [What the broader research is about, why this
+   sub-question matters, what the lead will do with the results]
+
+4. KEY QUESTIONS TO ANSWER: [3-7 specific sub-sub-questions that together
+   answer the objective. These guide the agent's search strategy.]
+
+5. SUGGESTED SOURCES & TOOLS: [Starting points, domains to prioritize,
+   tools to use. e.g., "Start with arxiv.org for papers, then check
+   industry blogs. Use WebFetch for full content of promising results."]
+
+6. SCOPE BOUNDARIES: [What NOT to research - explicit exclusions that
+   prevent overlap with sibling agents. e.g., "Do NOT cover pricing -
+   Agent 3 handles that. Do NOT cover history before 2024."]
 ```
 
-**Example parallel execution (using Exa MCP - if available):**
+### Worked Example
+
+**Research question:** "What is the current state of WebAssembly outside the browser?"
+
+**Classification:** Breadth-first (distinct domains of WASM usage)
+
+**Decomposition into 4 agents:**
+
+**Agent 1 Brief:**
 ```
-[Single message with multiple tool calls]
-- mcp__Exa__exa_search(query="quantum computing state of the art", type="neural", num_results=10, start_published_date="[use current year from Step 0]")
-- mcp__Exa__exa_search(query="quantum computing limitations", type="keyword", num_results=10)
-- mcp__Exa__exa_search(query="quantum computing commercial", type="auto", num_results=10, start_published_date="[use current year from Step 0]")
-- mcp__Exa__exa_search(query="quantum error correction", type="neural", num_results=10, include_domains=["arxiv.org"])
-- Task(subagent_type="general-purpose", description="Academic analysis", prompt="Analyze quantum computing academic papers")
+OBJECTIVE: Research WebAssembly usage in server-side/cloud computing as of 2025-2026.
+
+OUTPUT FORMAT: Dense prose report covering current production deployments,
+performance benchmarks vs containers, and adoption trajectory. Include
+exact version numbers and benchmark figures. Flag speculation. End with
+Key Findings (max 10 items).
+
+BACKGROUND: We're writing a comprehensive research report on WASM outside
+the browser. Your findings will be synthesized with 3 other agents covering
+edge computing, embedded/IoT, and the plugin/extension ecosystem.
+
+KEY QUESTIONS:
+- Which cloud providers offer WASM runtimes in production (not preview)?
+- What are the measured cold-start and throughput numbers vs Docker?
+- Which companies run WASM in production at scale? What workloads?
+- What is WASI Preview 2 status and adoption?
+- What are the main blockers to broader server-side adoption?
+
+SUGGESTED SOURCES: Start with CNCF landscape, Bytecode Alliance blog,
+Fermyon/Cosmonic/Fastly engineering blogs. Use WebFetch on promising
+results for full content. Check arxiv for recent benchmarking papers.
+
+SCOPE BOUNDARIES: Do NOT cover browser WASM, edge computing (Agent 2
+handles that), IoT/embedded (Agent 3), or plugin systems (Agent 4).
+Focus exclusively on traditional server/cloud deployment.
 ```
 
-**Step 3: Collect and organize results**
+---
 
-As results arrive:
-1. Extract key passages with source metadata (title, URL, date, credibility)
-2. Track information gaps that emerge
-3. Follow promising tangents with additional targeted searches
-4. Maintain source diversity (mix academic, industry, news, technical docs)
-5. Monitor for quality threshold (see FFS pattern below)
+## Phase 3: FAN-OUT - Parallel Agent Deployment
 
-### First Finish Search (FFS) Pattern
+**Objective:** Spawn all research agents simultaneously.
 
-**Adaptive completion based on quality threshold:**
+**FORBIDDEN TOOLS IN THIS PHASE:** WebSearch, WebFetch. All research is delegated.
 
-**Quality gate:** Proceed to Phase 4 when FIRST threshold reached:
-- **Quick mode:** 10+ sources with avg credibility >60/100 OR 2 minutes elapsed
-- **Standard mode:** 15+ sources with avg credibility >60/100 OR 5 minutes elapsed
-- **Deep mode:** 25+ sources with avg credibility >70/100 OR 10 minutes elapsed
-- **UltraDeep mode:** 30+ sources with avg credibility >75/100 OR 15 minutes elapsed
+### Execution Protocol
 
-**Continue background searches:**
-- If threshold reached early, continue remaining parallel searches in background
-- Additional sources used in Phase 5 (SYNTHESIZE) for depth and diversity
-- Allows fast progression without sacrificing thoroughness
+**Step 1: Launch ALL agents in a single message with parallel tool calls.**
 
-### Quality Standards
+Use the `Agent` tool with `subagent_type="general-purpose"` for each:
 
-**Source diversity requirements:**
-- Minimum 3 source types (academic, industry, news, technical docs)
-- Temporal diversity (mix of recent 12-18 months + foundational older sources)
-- Perspective diversity (proponents + critics + neutral analysis)
-- Geographic diversity (not just US sources)
+```
+Agent(
+  subagent_type="general-purpose",
+  description="Research: [brief objective summary]",
+  prompt="[FULL AGENT BRIEF - see below]"
+)
+```
 
-**Credibility tracking:**
-- Score each source 0-100 using source_evaluator.py
-- Flag low-credibility sources (<40) for additional verification
-- Prioritize high-credibility sources (>80) for core claims
+**Step 2: Construct each agent's full prompt.**
 
-**Techniques:**
-- Use WebSearch for current information (primary tool)
-- Use search-cli for multi-provider aggregated search (if installed)
-- Use WebFetch for deep dives into specific sources (secondary)
-- Use Exa search (via WebSearch with type="neural") for semantic exploration
-- Use Grep/Read for local documentation
-- Execute code for computational analysis (when needed)
-- Use Task tool to spawn parallel retrieval agents (3-5 agents)
+Each agent receives a self-contained prompt built from:
+1. The system instructions (research process + guidelines)
+2. Their specific brief from Phase 2.5
 
-**Output:** Organized information repository with source tracking, credibility scores, and coverage map
+### Subagent System Prompt (embed in every agent's prompt)
+
+```
+You are a research subagent working as part of a team. The current date is
+[INSERT DATE]. You have been given a clear task by a lead researcher.
+Use your available tools (WebSearch, WebFetch) to accomplish this task.
+
+RESEARCH PROCESS:
+
+1. PLANNING: Think through the task. Make a research plan. Determine a
+   'research budget' - how many tool calls to conduct:
+   - Simple tasks: under 5 tool calls
+   - Medium tasks: 5-10 tool calls
+   - Complex multi-part tasks: 10-15 tool calls
+   Stick to this budget. Going over wastes resources.
+
+2. TOOL SELECTION:
+   - WebSearch: for discovering sources (keep queries SHORT - under 5 words)
+   - WebFetch: ALWAYS use to get full content of promising search results
+   The core loop: WebSearch to find sources -> WebFetch to read them fully.
+   Never rely solely on search snippets.
+
+3. RESEARCH LOOP (OODA):
+   - OBSERVE: What information is gathered? What's still needed?
+   - ORIENT: What tools and queries would be best next?
+   - DECIDE: Choose the most promising next action
+   - ACT: Execute with specific tool use
+   Repeat 5-15 times. Never use the exact same query twice.
+
+4. PARALLEL TOOL CALLS: When you need multiple independent searches,
+   fire them in a SINGLE message. Do not serialize independent lookups.
+
+5. SOURCE QUALITY: After each result, reason about quality:
+   - Is this speculation (future tense, "could", "may") or established fact?
+   - Is this an original source or aggregator/SEO farm?
+   - Does it have specific data points or just generalities?
+   - Flag issues rather than presenting dubious claims as facts.
+
+6. STOPPING RULE: When results show diminishing returns (same info
+   repeating, queries returning nothing new), STOP searching and compose
+   your report. Do not waste budget on redundant searches.
+
+REPORT FORMAT: Your report goes to a lead researcher who synthesizes
+across multiple agents. Be:
+- Dense and information-rich (not padded)
+- Specific (exact numbers, dates, versions, names)
+- Cited (note which URL provided each major fact)
+- Honest about uncertainty (flag speculation, single-source claims)
+
+End your report with:
+## Key Findings
+- [Max 10 bullet points summarizing the most important discoveries]
+
+## Sources Used
+- [List of URLs consulted with brief description of each]
+```
+
+**Step 3: Wait for all agents to complete.**
+
+Do not begin Phase 3.5 until all agents have returned. If one agent fails or times out, proceed with remaining results and note the gap.
+
+---
+
+## Phase 3.5: FAN-IN - Result Collection & Gap Analysis
+
+**Objective:** Collect all agent reports, identify gaps, optionally spawn follow-up agents.
+
+### Activities
+
+1. **Collect all reports** - Read each agent's full response.
+
+2. **Tally source pool:**
+   - Count unique URLs across all agents
+   - Quality gate: Standard needs 25+, Deep needs 50+, UltraDeep needs 80+
+   - If below threshold, spawn 1-2 targeted follow-up agents
+
+3. **Identify gaps:**
+   - Which sub-questions got weak coverage (few sources, low specificity)?
+   - Did any agent flag "couldn't find reliable information on X"?
+   - Are there contradictions between agents that need resolution?
+
+4. **Optional follow-up round (Deep/UltraDeep only):**
+   - Spawn 1-3 targeted agents to fill specific gaps
+   - These get VERY narrow briefs: "Resolve the contradiction between
+     Agent 2's claim that X and Agent 4's claim that Y" or "Find
+     quantitative data on Z - previous agent found only qualitative."
+   - Budget: 3-5 tool calls each (surgical, not exploratory)
+
+5. **Merge into unified fact base:**
+   - Organize findings by theme/sub-question
+   - Note source provenance (which agent found what)
+   - Flag contradictions for Phase 4 resolution
+   - Track confidence levels
+
+**Output:** Unified fact base organized by theme, with source tracking and gap annotations.
 
 ---
 
 ## Phase 4: TRIANGULATE - Cross-Reference Verification
 
-**Objective:** Validate information across multiple independent sources
+**Objective:** Validate information across multiple independent sources.
 
 **Activities:**
-1. Identify claims requiring verification
-2. Cross-reference facts across 3+ sources
-3. Flag contradictions or uncertainties
-4. Assess source credibility
+1. Identify core claims that drive the analysis
+2. Cross-reference each core claim across 3+ sources from DIFFERENT agents
+3. Flag contradictions or single-source claims
+4. Assess source credibility and recency
 5. Note consensus vs. debate areas
 6. Document verification status per claim
 
 **Quality Standards:**
-- Core claims must have 3+ independent sources
-- Flag any single-source information
-- Note recency of information
-- Identify potential biases
+- Core claims must have 3+ independent sources (from at least 2 different agents)
+- Flag any single-source information prominently
+- Prioritize recent sources over older ones for current-state claims
+- Identify potential biases (vendor docs vs independent analysis)
 
-**Output:** Verified fact base with confidence levels
+**Output:** Verified fact base with confidence levels per claim.
 
 ---
 
-## Phase 4.5: OUTLINE REFINEMENT - Dynamic Evolution (WebWeaver 2025)
+## Phase 4.5: OUTLINE REFINEMENT - Dynamic Evolution
 
-**Objective:** Adapt research direction based on evidence discovered
+**Objective:** Adapt research direction based on evidence discovered.
 
-**Problem Solved:** Prevents "locked-in" research when evidence points to different conclusions or uncovers more important angles than initially planned.
-
-**When to Execute:**
-- **Standard/Deep/UltraDeep modes only** (Quick mode skips this)
-- After Phase 4 (TRIANGULATE) completes
-- Before Phase 5 (SYNTHESIZE)
+**When to Execute:** Standard/Deep/UltraDeep modes only, after Phase 4.
 
 **Activities:**
 
-1. **Review Initial Scope vs. Actual Findings**
-   - Compare Phase 1 scope with Phase 3-4 discoveries
-   - Identify unexpected patterns or contradictions
-   - Note underexplored angles that emerged as critical
-   - Flag overexplored areas that proved less important
+1. **Compare scope vs findings:**
+   - Did evidence reveal more important angles than initially scoped?
+   - Are there unexpected patterns or contradictions?
+   - Did any sub-question prove much richer or emptier than expected?
 
-2. **Evaluate Outline Adaptation Need**
+2. **Evaluate adaptation need:**
+   - Major findings contradict initial assumptions -> adapt
+   - Critical subtopic emerged that wasn't planned -> add section
+   - Original question was too broad/narrow -> adjust scope
+   - Evidence aligns with plan, no surprises -> keep structure
 
-   **Signals for adaptation (ANY triggers refinement):**
-   - Major findings contradict initial assumptions
-   - Evidence reveals more important angle than originally scoped
-   - Critical subtopic emerged that wasn't in original plan
-   - Original research question was too broad/narrow based on evidence
-   - Sources consistently discuss aspects not in initial outline
-
-   **Signals to keep current outline:**
-   - Evidence aligns with initial scope
-   - All key angles adequately covered
-   - No major gaps or surprises
-
-3. **Refine Outline (if needed)**
-
-   **Update structure to reflect evidence:**
+3. **Refine outline if needed:**
    - Add sections for unexpected but important findings
    - Demote/remove sections with insufficient evidence
-   - Reorder sections based on evidence strength and importance
-   - Adjust scope boundaries based on what's actually discoverable
+   - Reorder by evidence strength and importance
 
-   **Example adaptation:**
-   ```
-   Original outline:
-   1. Introduction
-   2. Technical Architecture
-   3. Performance Benchmarks
-   4. Conclusion
+4. **Targeted gap filling (if major gaps found):**
+   - Launch 1-2 targeted agents (narrow brief, 3-5 tool calls each)
+   - Time-box: do not restart full Phase 3
 
-   Refined after Phase 4 (evidence revealed security as critical):
-   1. Introduction
-   2. Technical Architecture
-   3. **Security Vulnerabilities (NEW - major finding)**
-   4. Performance Benchmarks (demoted - less critical than expected)
-   5. **Real-World Failure Modes (NEW - pattern emerged)**
-   6. Synthesis & Recommendations
-   ```
-
-4. **Targeted Gap Filling (if major gaps found)**
-
-   If outline refinement reveals critical knowledge gaps:
-   - Launch 2-3 targeted searches for newly identified angles
-   - Quick retrieval only (don't restart full Phase 3)
-   - Time-box to 2-5 minutes
-   - Update triangulation for new evidence only
-
-5. **Document Adaptation Rationale**
-
-   Record in methodology appendix:
-   - What changed in outline
-   - Why it changed (evidence-driven reasons)
-   - What additional research was conducted (if any)
-
-**Quality Standards:**
-- Adaptation must be evidence-driven (cite specific sources that prompted change)
-- No more than 50% outline restructuring (if more needed, scope was severely mis scoped)
-- Retain original research question core (don't drift into different topic entirely)
-- New sections must have supporting evidence already gathered
-
-**Output:** Refined outline that accurately reflects evidence landscape, ready for synthesis
-
-**Anti-Pattern Warning:**
-- ❌ DON'T adapt outline based on speculation or "what would be interesting"
-- ❌ DON'T add sections without supporting evidence already in hand
-- ❌ DON'T completely abandon original research question
-- ✅ DO adapt when evidence clearly indicates better structure
-- ✅ DO document rationale for changes
-- ✅ DO stay within original topic scope
+**Output:** Refined outline reflecting the actual evidence landscape.
 
 ---
 
 ## Phase 5: SYNTHESIZE - Deep Analysis
 
-**Objective:** Connect insights and generate novel understanding
+**Objective:** Connect insights and generate novel understanding.
 
 **Activities:**
-1. Identify patterns across sources
-2. Map relationships between concepts
-3. Generate insights beyond source material
-4. Create conceptual frameworks
-5. Build argument structures
-6. Develop evidence hierarchies
+1. Identify patterns ACROSS agent reports (not visible to any single agent)
+2. Map relationships between concepts from different sub-questions
+3. Generate insights beyond source material (second-order implications)
+4. Create conceptual frameworks that organize the findings
+5. Build argument structures with evidence hierarchies
+6. Write inline citations [N] for every factual claim
 
-**Ultrathink Integration:** Use extended reasoning to explore non-obvious connections and second-order implications.
+**This is where the lead's value appears.** Individual agents found facts. The lead connects them into understanding that no single agent could produce - because they each only saw their slice.
 
-**Output:** Synthesized understanding with insight generation
+**Output:** Synthesized understanding with insight generation and full citation trail.
 
 ---
 
 ## Phase 6: CRITIQUE - Quality Assurance
 
-**Objective:** Rigorously evaluate research quality
+**Objective:** Rigorously evaluate research quality.
 
 **Activities:**
-1. Review for logical consistency
-2. Check citation completeness
-3. Identify gaps or weaknesses
+1. Review for logical consistency across the full analysis
+2. Check citation completeness (every factual claim cited?)
+3. Identify remaining gaps or weaknesses
 4. Assess balance and objectivity
-5. Verify claims against sources
+5. Verify claims against the source reports
 6. Test alternative interpretations
 
 **Red Team Questions:**
-- What's missing?
-- What could be wrong?
-- What alternative explanations exist?
-- What biases might be present?
+- What's missing that a domain expert would notice?
+- What could be wrong? What alternative explanations exist?
+- Which claims rest on single-source evidence?
+- What biases might be present (vendor, geographic, recency)?
 - What counterfactuals should be considered?
 
 **Persona-Based Critique (Deep/UltraDeep only):**
-Simulate 2-3 specific critic personas relevant to the topic:
-- "Skeptical Practitioner" — Would someone doing this daily trust these findings?
-- "Adversarial Reviewer" — What would a peer reviewer reject?
-- "Implementation Engineer" — Can these recommendations actually be executed?
+- "Skeptical Practitioner" - Would someone doing this daily trust these findings?
+- "Adversarial Reviewer" - What would a peer reviewer reject?
+- "Implementation Engineer" - Can these recommendations be executed?
 
 **Critical Gap Loop-Back:**
-If critique identifies a critical knowledge gap (not just a writing issue), return to Phase 3 with targeted "delta-queries" before proceeding to Phase 7. Time-box to 3-5 minutes. This prevents publishing reports with known blind spots.
+If critique identifies a critical knowledge gap (not just a writing issue), spawn 1-2 targeted agents with narrow briefs before proceeding to Phase 7. Time-box to 3-5 tool calls per agent.
 
-**Output:** Critique report with improvement recommendations
+**Output:** Critique report with improvement recommendations.
 
 ---
 
 ## Phase 7: REFINE - Iterative Improvement
 
-**Objective:** Address gaps and strengthen weak areas
+**Objective:** Address gaps and strengthen weak areas.
 
 **Activities:**
-1. Conduct additional research for gaps
-2. Strengthen weak arguments
+1. Conduct additional targeted research for critical gaps (via Agent tool)
+2. Strengthen weak arguments with additional evidence
 3. Add missing perspectives
-4. Resolve contradictions
-5. Enhance clarity
-6. Verify revised content
+4. Resolve contradictions (with source citations for resolution)
+5. Enhance clarity of complex arguments
+6. Verify revised content against sources
 
-**Output:** Strengthened research with addressed deficiencies
+**Output:** Strengthened research with addressed deficiencies.
 
 ---
 
 ## Phase 8: PACKAGE - Report Generation
 
-**Objective:** Deliver professional, actionable research
+**Objective:** Deliver professional, actionable research.
 
 **Activities:**
 1. Structure report with clear hierarchy
-2. Write executive summary
-3. Develop detailed sections
-4. Create visualizations (tables, diagrams)
-5. Compile full bibliography
-6. Add methodology appendix
+2. Write executive summary (200-400 words)
+3. Develop detailed sections with inline citations
+4. Create visualizations (tables, comparison matrices, diagrams)
+5. Compile full bibliography (COMPLETE - every URL from every agent)
+6. Add methodology appendix (document agent count, decomposition, gaps)
 
-**Output:** Complete research report ready for use
+**Load [report-assembly.md](./report-assembly.md) for progressive generation instructions.**
+
+**Output:** Complete research report.
 
 ---
 
-## Advanced Features
+## Mode-Specific Behavior
 
-### Graph-of-Thoughts Reasoning
+### Quick Mode
+- Phases 2.5, 3, 3.5 are SKIPPED entirely - no fan-out orchestration
+- Lead searches directly: 5-10 WebSearch + WebFetch calls (like a focused single-context researcher)
+- Optionally spawn 1 verification agent for a second perspective
+- Skip Phases 4.5, 6, 7
+- Target: 10+ sources, 2-5 minutes
+- This is the ONLY mode where the lead calls WebSearch/WebFetch
 
-Rather than linear thinking, branch into multiple reasoning paths:
-- Explore alternative framings in parallel
-- Pursue tangential leads that might be relevant
-- Merge insights from different branches
-- Backtrack and revise as new information emerges
+### Standard Mode (DEFAULT)
+- 3-5 agents, lead never searches
+- Full Phase 1-5 + 8
+- Skip Phases 6, 7
+- Target: 25+ sources, 5-10 minutes
 
-### Parallel Agent Deployment
+### Deep Mode
+- 5-8 agents, lead never searches
+- Full Phase 1-8
+- Mandatory follow-up round in Phase 3.5
+- Target: 50+ sources, 10-20 minutes
 
-Use Task tool to spawn sub-agents for:
-- Parallel source retrieval
-- Independent verification paths
-- Competing hypothesis evaluation
-- Specialized domain analysis
-
-### Adaptive Depth Control
-
-Automatically adjust research depth based on:
-- Information complexity
-- Source availability
-- Time constraints
-- Confidence levels
-
-### Citation Intelligence
-
-Smart citation management:
-- Track provenance of every claim
-- Link to original sources
-- Assess source credibility
-- Handle conflicting sources
-- Generate proper bibliographies
+### UltraDeep Mode
+- 8-15 agents, lead never searches
+- Full Phase 1-8
+- Mandatory follow-up round in Phase 3.5
+- Persona-based critique in Phase 6
+- Target: 80+ sources, 20-45 minutes
