@@ -169,15 +169,18 @@ Focus exclusively on traditional server/cloud deployment.
 
 **Step 1: Launch ALL agents in a single message with parallel tool calls.**
 
-Use the `Agent` tool with `subagent_type="general-purpose"` for each:
+Use the `Agent` tool with `subagent_type="general-purpose"` and `model="sonnet"`:
 
 ```
 Agent(
   subagent_type="general-purpose",
+  model="sonnet",
   description="Research: [brief objective summary]",
   prompt="[FULL AGENT BRIEF - see below]"
 )
 ```
+
+**Model selection:** Subagents MUST use `model="sonnet"`. Their task (search + read + extract + report) is Sonnet-tier work. Opus stays only in the lead context (Phases 2.5, 3.5, 4-8) where cross-agent synthesis and insight generation require it. This matches Anthropic's production architecture (Opus lead + Sonnet workers) which outperforms single-agent Opus by 90%.
 
 **Step 2: Construct each agent's full prompt.**
 
