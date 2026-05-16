@@ -1,55 +1,64 @@
-# Deep Research Skill for Claude Code
+# Claude Adaptive Research Skill
 
-Enterprise-grade research engine for Claude Code. Produces citation-backed reports with source credibility scoring, multi-provider search, and automated validation.
+Multi-agent fan-out research skill for Claude Code. A lead orchestrator (Opus) decomposes queries into non-overlapping sub-questions, delegates to N independent Sonnet researchers (each with 5-15 searches), then synthesizes cross-agent insights into citation-backed reports.
+
+**Origin:** Forked from [199-biotechnologies/claude-deep-research-skill](https://github.com/199-biotechnologies/claude-deep-research-skill) (v2.3.2). Architecture rewritten to multi-agent fan-out pattern based on [Anthropic's multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system).
+
+## Architecture
+
+```
+Lead Orchestrator (Opus, this context - NEVER searches)
+    |
+    +-- SCOPE (define boundaries)
+    +-- CLASSIFY (depth-first / breadth-first / straightforward)
+    +-- DECOMPOSE (N non-overlapping sub-questions + 6-component briefs)
+    +-- FAN-OUT (spawn N Sonnet agents in parallel)
+    |       |-- Agent 1: Sub-question A (5-15 searches, OODA loop)
+    |       |-- Agent 2: Sub-question B (5-15 searches, OODA loop)
+    |       +-- Agent N: Sub-question N (5-15 searches, OODA loop)
+    +-- FAN-IN (collect reports, gap analysis, optional follow-up agents)
+    +-- TRIANGULATE (cross-verify across agent reports)
+    +-- SYNTHESIZE (cross-agent insights no single agent could produce)
+    +-- CRITIQUE + REFINE (red-team, fill gaps)
+    +-- PACKAGE (final report with full bibliography)
+```
+
+## Key Differences from Upstream
+
+| Aspect | Upstream (v2.x) | This Fork (v3) |
+|---|---|---|
+| Who searches | Main context fires WebSearch | Lead NEVER searches (except Quick mode) |
+| Decomposition | None - overlapping thematic cuts | Explicit classify + decompose into non-overlapping sub-questions |
+| Agent briefing | Vague: "Analyze X papers" | 6-component brief: objective, format, context, questions, sources, scope boundaries |
+| Agent model | Unspecified | Enforced: `model="sonnet"` (Opus wasted on search+extract) |
+| Source pool | 10-30 total (heavily duplicated) | 25-80+ unique (non-overlapping by construction) |
+| Agent budget | Undefined | 5-15 tool calls per agent, OODA loop, stopping rule |
+| Quality gate | FFS threshold | Per-agent source quality reasoning + lead cross-verification |
 
 ## Installation
 
 ```bash
-# Clone into Claude Code skills directory
-git clone https://github.com/199-biotechnologies/claude-deep-research-skill.git ~/.claude/skills/deep-research
-```
-
-No additional dependencies required for basic usage.
-
-### Optional: search-cli (multi-provider search)
-
-For aggregated search across Brave, Serper, Exa, Jina, and Firecrawl:
-
-```bash
-brew tap 199-biotechnologies/tap && brew install search-cli
-search config set keys.brave YOUR_KEY  # configure at least one provider
+git clone https://github.com/MalfiRG/claude-adaptive-research-skill.git ~/.claude/skills/deep-research
 ```
 
 ## Usage
 
 ```
-deep research on the current state of quantum computing
+deep research on the current state of WebAssembly outside the browser
 ```
 
 ```
-deep research in ultradeep mode: compare PostgreSQL vs Supabase for our stack
+deep research in ultradeep mode: compare SDET observability across fintech vs big tech
 ```
 
 ## Research Modes
 
-| Mode | Phases | Duration | Best For |
-|------|--------|----------|----------|
-| Quick | 3 | 2-5 min | Initial exploration |
-| Standard | 6 | 5-10 min | Most research questions |
-| Deep | 8 | 10-20 min | Complex topics, critical decisions |
-| UltraDeep | 8+ | 20-45 min | Comprehensive reports, maximum rigor |
-
-## Pipeline
-
-Scope &rarr; Plan &rarr; **Retrieve** (parallel search + agents) &rarr; Triangulate &rarr; Outline Refinement &rarr; Synthesize &rarr; Critique (with loop-back) &rarr; Refine &rarr; Package
-
-Key features:
-- **Step 0**: Retrieves current date before searches (prevents stale training-data year assumptions)
-- **Parallel retrieval**: 5-10 concurrent searches + 2-3 focused sub-agents returning structured evidence objects
-- **First Finish Search**: Adaptive quality thresholds by mode
-- **Critique loop-back**: Phase 6 can return to Phase 3 with delta-queries if critical gaps found
-- **Multi-persona red teaming**: Skeptical Practitioner, Adversarial Reviewer, Implementation Engineer (Deep/UltraDeep)
-- **Disk-persisted citations**: `sources.json` survives context compaction and continuation agents
+| Mode | Agents | Sources | Token Cost | Best For |
+|------|--------|---------|------------|----------|
+| Quick | 0 (lead searches directly) | 10+ | ~4x | Fast exploration |
+| Standard | 3-5 Sonnet | 25+ | ~10x | Most research questions |
+| Deep | 5-8 Sonnet | 50+ | ~15x | Complex topics, critical decisions |
+| UltraDeep | 8-15 Sonnet | 80+ | ~20x | Comprehensive reports, maximum rigor |
 
 ## Output
 
@@ -58,62 +67,47 @@ Reports saved to `~/Documents/[Topic]_Research_[Date]/`:
 - HTML (McKinsey-style, auto-opened in browser)
 - PDF (professional print via WeasyPrint)
 
-Reports >18K words auto-continue via recursive agent spawning with context preservation.
-
 ## Quality Standards
 
-- 10+ sources, 3+ per major claim
+- 25+ sources (Standard), 50+ (Deep), 80+ (UltraDeep)
+- 3+ independent sources per major claim (from at least 2 different agents)
 - Executive summary 200-400 words
 - Findings 600-2,000 words each, prose-first (>=80%)
-- Full bibliography with URLs, no placeholders
-- Automated validation: `validate_report.py` (9 checks) + `verify_citations.py` (DOI/URL/hallucination detection)
-- Validation loop: validate &rarr; fix &rarr; retry (max 3 cycles)
+- Full bibliography with URLs from all agents
+- Automated validation: `validate_report.py` + `verify_citations.py`
 
-## Search Tools
-
-| Tool | When | Setup |
-|------|------|-------|
-| WebSearch | Default, always available | None |
-| Exa MCP | Semantic/neural search | MCP config |
-| search-cli | Multi-provider aggregation | `brew install search-cli` + API keys |
-
-## Architecture
+## File Structure
 
 ```
-deep-research/
-├── SKILL.md                          # Skill entry point (lean, ~100 lines)
-├── reference/
-│   ├── methodology.md                # 8-phase pipeline details
-│   ├── report-assembly.md            # Progressive generation strategy
-│   ├── quality-gates.md              # Validation standards
-│   ├── html-generation.md            # McKinsey HTML conversion
-│   ├── continuation.md               # Auto-continuation protocol
-│   └── weasyprint_guidelines.md      # PDF generation
-├── templates/
-│   ├── report_template.md            # Report structure template
-│   └── mckinsey_report_template.html # HTML report template
-├── scripts/
-│   ├── validate_report.py            # 9-check structure validator
-│   ├── verify_citations.py           # DOI/URL/hallucination checker
-│   ├── source_evaluator.py           # Source credibility scoring
-│   ├── citation_manager.py           # Citation tracking
-│   ├── md_to_html.py                 # Markdown to HTML converter
-│   ├── verify_html.py                # HTML verification
-│   └── research_engine.py            # Core orchestration engine
-└── tests/
-    └── fixtures/                     # Test report fixtures
+claude-adaptive-research-skill/
++-- SKILL.md                          # Skill entry point
++-- reference/
+|   +-- methodology.md                # Fan-out pipeline (the core)
+|   +-- report-assembly.md            # Progressive generation
+|   +-- quality-gates.md              # Validation standards
+|   +-- html-generation.md            # McKinsey HTML conversion
+|   +-- continuation.md               # Auto-continuation for long reports
+|   +-- weasyprint_guidelines.md      # PDF generation
++-- templates/
+|   +-- report_template.md            # Report structure template
+|   +-- mckinsey_report_template.html # HTML styling
++-- scripts/
+|   +-- validate_report.py            # Structure validator
+|   +-- verify_citations.py           # Citation checker
+|   +-- citation_manager.py           # Citation tracking
+|   +-- md_to_html.py                 # Markdown to HTML
+|   +-- verify_html.py                # HTML verification
++-- tests/
+    +-- fixtures/                     # Test report fixtures
 ```
 
 ## Version History
 
 | Version | Date | Changes |
-|---------|------|---------|
-| 2.3.1 | 2026-03-19 | Template/validator harmonization, structured evidence, critique loop-back, multi-persona red teaming |
-| 2.3 | 2026-03-19 | Contract harmonization, search-cli integration, dynamic year detection, disk-persisted citations, validation loops |
-| 2.2 | 2025-11-05 | Auto-continuation system for unlimited length |
-| 2.1 | 2025-11-05 | Progressive file assembly |
-| 1.0 | 2025-11-04 | Initial release |
+|---|---|---|
+| 3.0 | 2026-05-16 | Multi-agent fan-out architecture. Lead never searches. Sonnet subagents with 6-component briefs. Non-overlapping decomposition. 25-80+ source targets. |
+| 2.3.2 | 2026-03-19 | Last upstream-compatible version (snapshot before rewrite) |
 
 ## License
 
-MIT - modify as needed for your workflow.
+MIT
