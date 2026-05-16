@@ -74,7 +74,7 @@ Reports saved to `~/Documents/[Topic]_Research_[Date]/`:
 - Executive summary 200-400 words
 - Findings 600-2,000 words each, prose-first (>=80%)
 - Full bibliography with URLs from all agents
-- Automated validation: `validate_report.py` + `verify_citations.py`
+- Post-production: `verify_citations.py` (URL/DOI verification, hallucination detection)
 
 ## File Structure
 
@@ -92,11 +92,7 @@ claude-adaptive-research-skill/
 |   +-- report_template.md            # Report structure template
 |   +-- mckinsey_report_template.html # HTML styling
 +-- scripts/
-|   +-- validate_report.py            # Structure validator
-|   +-- verify_citations.py           # Citation checker
-|   +-- citation_manager.py           # Citation tracking
-|   +-- md_to_html.py                 # Markdown to HTML
-|   +-- verify_html.py                # HTML verification
+|   +-- verify_citations.py           # URL/DOI verification + hallucination detection
 +-- tests/
     +-- fixtures/                     # Test report fixtures
 ```

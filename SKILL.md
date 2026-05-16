@@ -68,10 +68,8 @@ Mode Selection (determines agent count + token budget)
 - Report structure: [report_template.md](./templates/report_template.md)
 - HTML styling: [mckinsey_report_template.html](./templates/mckinsey_report_template.html)
 
-**Scripts:**
-- `python scripts/validate_report.py --report [path]`
-- `python scripts/verify_citations.py --report [path]`
-- `python scripts/md_to_html.py [markdown_path]`
+**Post-production validation:**
+- `python scripts/verify_citations.py --report [path]` (URL accessibility + DOI resolution + hallucination detection)
 
 ---
 
