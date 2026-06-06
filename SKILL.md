@@ -1,6 +1,6 @@
 ---
 name: deep-research
-description: Conducts enterprise-grade research with multi-source synthesis, citation tracking, and verification. Produces citation-backed reports through a structured pipeline with source credibility scoring. Triggers on "deep research", "comprehensive analysis", "research report", "compare X vs Y", "analyze trends", or "state of the art". Not for simple lookups, debugging, or questions answerable with 1-2 searches.
+description: Multi-source citation-backed research reports with credibility scoring. For complex analyses, comparisons, and trend reports - not simple lookups.
 ---
 
 # Deep Research v3 - Multi-Agent Fan-Out Architecture
