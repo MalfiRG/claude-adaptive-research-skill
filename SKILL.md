@@ -1,6 +1,6 @@
 ---
-name: deep-research
-description: Multi-source citation-backed research reports with credibility scoring. For complex analyses, comparisons, and trend reports - not simple lookups.
+name: deep-research-claude
+description: Multi-source citation-backed research reports with credibility scoring via Claude subagent fan-out. For complex analyses, comparisons, and trend reports - not simple lookups.
 ---
 
 # Deep Research v3 - Multi-Agent Fan-Out Architecture
@@ -85,7 +85,7 @@ Mode Selection (determines agent count + token budget)
 - Bibliography (COMPLETE - every citation, no placeholders)
 - Methodology Appendix
 
-**Output files (all to `~/Documents/[Topic]_Research_[YYYYMMDD]/`):**
+**Output files (all to `$RESEARCH_DIR/[Topic]_Research_[YYYYMMDD]/`, where `RESEARCH_DIR` defaults to `~/Documents` - override via the `RESEARCH_DIR` env var):**
 - Markdown (primary source)
 - HTML (McKinsey style, auto-opened)
 - PDF (professional print, auto-opened)

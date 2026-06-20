@@ -29,8 +29,9 @@
 ### Phase 8.1: Setup
 
 ```bash
-# Create folder: ~/Documents/[TopicName]_Research_[YYYYMMDD]/
-mkdir -p ~/Documents/[folder_name]
+# Output dir is set by the calling skill via $RESEARCH_DIR (default ~/Documents)
+: "${RESEARCH_DIR:=$HOME/Documents}"
+mkdir -p "$RESEARCH_DIR/[folder_name]"
 
 # Initialize markdown file with frontmatter
 # Path: [folder]/research_report_[YYYYMMDD]_[slug].md
@@ -92,7 +93,7 @@ Update sources.json after each section. This survives context compaction and ena
 ## File Organization
 
 **1. Create dedicated folder:**
-- Location: `~/Documents/[TopicName]_Research_[YYYYMMDD]/`
+- Location: `$RESEARCH_DIR/[TopicName]_Research_[YYYYMMDD]/` (default `~/Documents`)
 - Clean topic name (remove special chars, use underscores)
 
 **2. File naming convention:**

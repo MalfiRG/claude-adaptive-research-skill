@@ -38,7 +38,7 @@ Lead Orchestrator (Opus, this context - NEVER searches)
 ## Installation
 
 ```bash
-git clone https://github.com/MalfiRG/claude-adaptive-research-skill.git ~/.claude/skills/deep-research
+git clone https://github.com/MalfiRG/claude-adaptive-research-skill.git ~/.claude/skills/deep-research-claude
 ```
 
 ## Usage
