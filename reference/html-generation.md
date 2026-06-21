@@ -22,17 +22,13 @@ Extract 3-4 key quantitative findings for dashboard display at top.
 
 ### Step 3: Convert MD to HTML
 
-Use Python script:
-```bash
-cd ~/.claude/skills/deep-research
-python scripts/md_to_html.py [markdown_report_path]
-```
-
-**Script outputs two parts:**
+Generate the HTML inline (no external converter ships). Read the markdown report
+and the McKinsey template, then map each markdown construct to the template's HTML.
+Split the output into two parts for the template placeholders:
 - **Part A ({{CONTENT}}):** All sections except Bibliography
 - **Part B ({{BIBLIOGRAPHY}}):** Bibliography section only
 
-**Script handles all conversion:**
+**Conversion mapping:**
 - Headers: `##` -> `<div class="section"><h2 class="section-title">`
 - Headers: `###` -> `<h3 class="subsection-title">`
 - Lists: Markdown bullets -> `<ul><li>` with nesting
@@ -71,11 +67,12 @@ NOTE: This step is optional for speed. Basic [N] citations are sufficient.
 
 ### Step 6: Verify HTML
 
-```bash
-python scripts/verify_html.py --html [html_path] --md [md_path]
-```
-- Pass: Proceed to open
-- Fail: Fix errors and re-run
+Manual check (no verify script ships):
+- Every `## ` section from the markdown appears in the HTML
+- `{{SOURCE_COUNT}}` in the dashboard matches the bibliography entry count
+- No unfilled `{{PLACEHOLDER}}` tokens remain
+- Tables render as `<table>`, not raw `|` pipes
+- Fix any failure and re-render before opening
 
 ### Step 7: Open in Browser
 ```bash
@@ -85,6 +82,14 @@ open [html_path]
 ---
 
 ## PDF Generation
+
+**Preflight:** PDF is optional. Check for a renderer first:
+```bash
+command -v weasyprint || python3 -c "import weasyprint" 2>/dev/null || echo "no-weasyprint"
+```
+If no renderer and the `generating-pdf` skill is unavailable, deliver the markdown
+and HTML as the primary artifacts and note in the final message that PDF was
+skipped (missing renderer). Do NOT fail the run over a missing PDF.
 
 **Option A: WeasyPrint Direct (Preferred)**
 
