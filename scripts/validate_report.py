@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""Validate deep-research Markdown report structure and citation consistency."""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import re
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+LOGGER = logging.getLogger(__name__)
+REQUIRED_SECTIONS: tuple[str, ...] = (
+    "Executive Summary",
+    "Introduction",
+    "Main Analysis",
+    "Synthesis",
+    "Limitations",
+    "Recommendations",
+    "Bibliography",
+    "Methodology",
+)
+PLACEHOLDER_PATTERN = re.compile(
+    r"\b(TBD|TODO|FIXME|placeholder|additional sources|content continues|etc\.)\b",
+    re.IGNORECASE,
+)
+CITATION_PATTERN = re.compile(r"\[(\d+)\]")
+CITATION_RANGE_PATTERN = re.compile(r"\[\d+\s*-\s*\d+\]")
+HEADING_PATTERN = re.compile(r"^##+\s+(.+?)\s*$", re.MULTILINE)
+
+
+@dataclass
+class ValidationResult:
+    """Container for validation findings."""
+
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    @property
+    def passed(self) -> bool:
+        """Return true when no blocking errors were found."""
+        return not self.errors
+
+    def add_error(self, message: str) -> None:
+        """Add a blocking validation error."""
+        self.errors.append(message)
+
+    def add_warning(self, message: str) -> None:
+        """Add a non-blocking validation warning."""
+        self.warnings.append(message)
+
+
+class ReportValidator:
+    """Validate one Markdown research report."""
+
+    def __init__(self, report_path: Path) -> None:
+        self.report_path = report_path
+        self.content = report_path.read_text(encoding="utf-8")
+        self.result = ValidationResult()
+
+    def validate(self) -> ValidationResult:
+        """Run all validation checks and return the result."""
+        self._check_required_sections()
+        self._check_placeholders()
+        self._check_citations()
+        self._check_summary_length()
+        self._check_word_count()
+        return self.result
+
+    def _check_required_sections(self) -> None:
+        headings = [heading.lower() for heading in HEADING_PATTERN.findall(self.content)]
+        for section in REQUIRED_SECTIONS:
+            if not any(section.lower() in heading for heading in headings):
+                self.result.add_error(f"Missing required section: {section}")
+
+    def _check_placeholders(self) -> None:
+        matches = sorted(set(match.group(0) for match in PLACEHOLDER_PATTERN.finditer(self.content)))
+        if matches:
+            self.result.add_error(f"Placeholder text found: {', '.join(matches)}")
+
+    def _check_citations(self) -> None:
+        if CITATION_RANGE_PATTERN.search(self.content):
+            self.result.add_error("Citation range found. Use individual citations instead.")
+
+        body, bibliography = self._split_bibliography()
+        body_citations = set(CITATION_PATTERN.findall(body))
+        bibliography_citations = set(
+            match.group(1)
+            for match in re.finditer(r"^\[(\d+)\]\s+.+$", bibliography, re.MULTILINE)
+        )
+
+        if not bibliography_citations:
+            self.result.add_error("No bibliography entries found")
+            return
+
+        missing = sorted(body_citations - bibliography_citations, key=int)
+        if missing:
+            self.result.add_error(f"Citations missing from bibliography: {', '.join(missing)}")
+
+        unused = sorted(bibliography_citations - body_citations, key=int)
+        if unused:
+            self.result.add_warning(f"Bibliography entries not cited in body: {', '.join(unused)}")
+
+        if len(bibliography_citations) < 10:
+            self.result.add_warning(f"Source count below baseline target: {len(bibliography_citations)}")
+
+    def _check_summary_length(self) -> None:
+        summary = self._section_text("Executive Summary")
+        if not summary:
+            return
+        word_count = len(re.findall(r"\b\w+\b", summary))
+        if word_count < 200 or word_count > 400:
+            self.result.add_error(
+                f"Executive Summary length is {word_count} words; expected 200-400"
+            )
+
+    def _check_word_count(self) -> None:
+        word_count = len(re.findall(r"\b\w+\b", self.content))
+        if word_count < 500:
+            self.result.add_error(f"Report is too short: {word_count} words")
+
+    def _split_bibliography(self) -> tuple[str, str]:
+        match = re.search(r"^##\s+Bibliography\s*$", self.content, re.MULTILINE | re.IGNORECASE)
+        if not match:
+            return self.content, ""
+        return self.content[: match.start()], self.content[match.end() :]
+
+    def _section_text(self, section_name: str) -> str:
+        pattern = re.compile(
+            rf"^##\s+{re.escape(section_name)}\s*$\n(?P<body>.*?)(?=^##\s+|\Z)",
+            re.MULTILINE | re.DOTALL | re.IGNORECASE,
+        )
+        match = pattern.search(self.content)
+        return match.group("body").strip() if match else ""
+
+
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description="Validate a deep-research Markdown report")
+    parser.add_argument("--report", "-r", required=True, type=Path, help="Report path")
+    return parser.parse_args()
+
+
+def configure_logging() -> None:
+    """Configure console logging."""
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+
+def main() -> int:
+    """Run the validator."""
+    configure_logging()
+    args = parse_args()
+
+    if not args.report.exists():
+        LOGGER.error("ERROR: Report file not found: %s", args.report)
+        return 1
+
+    try:
+        validator = ReportValidator(args.report)
+    except OSError as exc:
+        LOGGER.error("ERROR: Cannot read report: %s", exc)
+        return 1
+
+    result = validator.validate()
+
+    LOGGER.info("STRUCTURE VALIDATION: %s", args.report)
+    for warning in result.warnings:
+        LOGGER.warning("WARNING: %s", warning)
+    for error in result.errors:
+        LOGGER.error("ERROR: %s", error)
+
+    if result.passed:
+        LOGGER.info("REPORT VALIDATION PASSED")
+        return 0
+
+    LOGGER.error("REPORT VALIDATION FAILED")
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
