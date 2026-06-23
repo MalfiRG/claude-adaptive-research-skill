@@ -27,11 +27,15 @@ PLACEHOLDER_PATTERN = re.compile(
 )
 CITATION_PATTERN = re.compile(r"\[([A-Za-z]{0,12}[-_ ]?\d+)\]")
 CITATION_RANGE_PATTERN = re.compile(r"\[\d+\s*-\s*\d+\]")
-BIBLIOGRAPHY_ENTRY_PATTERN = re.compile(r"^[-*]?\s*\[([^\]]+)\]\s+\S", re.MULTILINE)
+BIBLIOGRAPHY_ENTRY_PATTERN = re.compile(
+    r"^[-*]?\s*(?:\[([^\]]+)\]|(\d+)\.)\s+(.*)$", re.MULTILINE
+)
 BODY_KEY_PATTERN = re.compile(r"[A-Za-z]{0,12}[-_ ]?\d+[A-Za-z]?")
+URL_PATTERN = re.compile(r"https?://\S+")
 HEADING_PATTERN = re.compile(r"^##+\s+(.+?)\s*$", re.MULTILINE)
 
 DEFAULT_MIN_SOURCES = 10
+MIN_RICHNESS_CHARS = 4
 
 
 @dataclass
@@ -90,10 +94,8 @@ class ReportValidator:
 
         body, bibliography = self._split_bibliography()
         body_citations = self._body_citation_keys(body)
-        bibliography_citations = set(
-            match.group(1).strip()
-            for match in BIBLIOGRAPHY_ENTRY_PATTERN.finditer(bibliography)
-        )
+        entries = self._bibliography_entries(bibliography)
+        bibliography_citations = {key for key, _ in entries}
 
         if not bibliography_citations:
             self.result.add_error("No bibliography entries found")
@@ -113,6 +115,29 @@ class ReportValidator:
                 f"Source count {source_count} below floor of {self.min_sources} "
                 "for the selected mode"
             )
+
+        bare = [key for key, content in entries if self._is_bare_url(content)]
+        if bare:
+            preview = ", ".join(bare[:5]) + (" ..." if len(bare) > 5 else "")
+            self.result.add_error(
+                f"{len(bare)} bibliography entries are bare URLs with no title/author/date "
+                f"({preview}). Format: [N] Author/Org (Year). \"Title\". Publisher. URL"
+            )
+
+    @staticmethod
+    def _bibliography_entries(bibliography: str) -> list[tuple[str, str]]:
+        entries: list[tuple[str, str]] = []
+        for match in BIBLIOGRAPHY_ENTRY_PATTERN.finditer(bibliography):
+            key = (match.group(1) or match.group(2)).strip()
+            content = match.group(3).strip()
+            entries.append((key, content))
+        return entries
+
+    @staticmethod
+    def _is_bare_url(content: str) -> bool:
+        residual = URL_PATTERN.sub("", content)
+        residual = re.sub(r"[^A-Za-z0-9]", "", residual)
+        return len(residual) < MIN_RICHNESS_CHARS
 
     @staticmethod
     def _body_citation_keys(body: str) -> set[str]:

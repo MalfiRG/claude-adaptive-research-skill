@@ -411,11 +411,11 @@ If critique identifies a critical knowledge gap (not just a writing issue), spaw
 **Objective:** Deliver professional, actionable research.
 
 **Activities:**
-1. Structure report with clear hierarchy
+1. Structure report with clear hierarchy. Findings go as `### Finding N` subsections under one `## Main Analysis` heading - never as top-level `## Finding N` (the validator requires a literal Main Analysis section).
 2. Write executive summary (200-400 words)
 3. Develop detailed sections with inline citations
 4. Create visualizations (tables, comparison matrices, diagrams)
-5. Compile full bibliography (COMPLETE - every URL from every agent)
+5. Compile full bibliography (COMPLETE - every source from every agent), each entry `[N] Author/Org (Year). "Title". Publisher. URL` - never a bare URL
 6. Add methodology appendix (document agent count, decomposition, gaps)
 
 **Load [report-assembly.md](./report-assembly.md) for progressive generation instructions.**

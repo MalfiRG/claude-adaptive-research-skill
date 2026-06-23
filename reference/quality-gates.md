@@ -32,7 +32,9 @@ Pass `--min-sources` matching the selected mode: **Quick 10, Standard 25, Deep 5
 5. No placeholder text (TBD, TODO)
 6. Word count reasonable (500-10000)
 7. Source count at or above the mode floor (`--min-sources`)
-8. No broken internal links
+8. Bibliography entries are not bare URLs - each must carry title/author/date text, not just a link
+9. Findings nested under a `## Main Analysis` heading (required section)
+10. No broken internal links
 
 **Failure handling:**
 - Attempt 1: Auto-fix formatting/links
@@ -90,6 +92,11 @@ Before considering section complete:
 - Placeholders: "[8-75] Additional citations", "...continue...", "etc."
 - Ranges: "[3-50]" instead of individual entries
 - Truncation: Stop at 10 when 30 cited
+- **Bare URLs**: an entry that is only a link (`[3] https://...`) with no title/author/date. Every entry MUST carry descriptive text - `[N] Title - Publisher - Date - URL` at minimum. A bare-URL bibliography defeats credibility assessment and citation verification, and is a blocking validator error.
+
+## Report Structure (required headings)
+
+Findings are the body of the analysis, but they MUST be nested as `### Finding N` subsections under a single `## Main Analysis` heading - not promoted to top-level `## Finding N`. The validator requires a literal `Main Analysis` section; a report that heads findings at `##` level with no wrapper fails the structure check. Mirror the section order in `report_template.md`: Executive Summary, Introduction, Main Analysis (findings inside), Synthesis & Insights, Limitations & Caveats, Recommendations, Bibliography, Methodology.
 
 ---
 

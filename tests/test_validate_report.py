@@ -100,10 +100,28 @@ class TestSourceFloorAndKeyFormats(unittest.TestCase):
         self.assertFalse(any("below floor" in e for e in validator.result.errors))
         self.assertFalse(any("No bibliography entries" in e for e in validator.result.errors))
 
+    def test_numbered_list_bibliography_entries_counted(self) -> None:
+        bib = "\n".join(f"{i}. https://x{i}.com" for i in range(1, 13))
+        validator = self._validator(f"# R\n\nCites [1] and [2].\n\n## Bibliography\n{bib}\n", min_sources=10)
+        self.assertFalse(any("below floor" in e for e in validator.result.errors))
+        self.assertFalse(any("No bibliography entries" in e for e in validator.result.errors))
+
     def test_comma_grouped_body_keys_resolve_against_bibliography(self) -> None:
         bib = "- [GPU-1] alpha https://a.com\n- [GPU-2] beta https://b.com"
         validator = self._validator(f"# R\n\nClaim [GPU-1, GPU-2].\n\n## Bibliography\n{bib}\n", min_sources=2)
         self.assertFalse(any("missing from bibliography" in e.lower() for e in validator.result.errors))
+
+    def test_bare_url_bibliography_entries_flagged(self) -> None:
+        bib = "\n".join(f"{i}. https://x{i}.com" for i in range(1, 4))
+        validator = self._validator(f"# R\n\nCites [1].\n\n## Bibliography\n{bib}\n", min_sources=3)
+        self.assertTrue(any("bare URL" in e for e in validator.result.errors))
+
+    def test_rich_bibliography_entries_pass_richness(self) -> None:
+        bib = "\n".join(
+            f'[S{i}] Title {i} - Publisher - 2025 - https://x{i}.com' for i in range(1, 4)
+        )
+        validator = self._validator(f"# R\n\nCites [S1].\n\n## Bibliography\n{bib}\n", min_sources=3)
+        self.assertFalse(any("bare URL" in e for e in validator.result.errors))
 
 
 if __name__ == "__main__":

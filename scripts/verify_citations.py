@@ -85,13 +85,13 @@ class CitationVerifier:
                 continue
 
             # Check if starts with citation number [N]
-            match_num = re.match(r'^[-*]?\s*\[([^\]]+)\]\s+(.+)$', line)
+            match_num = re.match(r'^[-*]?\s*(?:\[([^\]]+)\]|(\d+)\.)\s+(.+)$', line)
             if match_num:
                 if current_entry:
                     entries.append(current_entry)
 
-                num = match_num.group(1)
-                rest = match_num.group(2)
+                num = match_num.group(1) or match_num.group(2)
+                rest = match_num.group(3)
 
                 # Try to parse: Author (Year). "Title". Venue. URL
                 year_match = re.search(r'\((\d{4})\)', rest)
