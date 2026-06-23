@@ -1,6 +1,6 @@
 ---
 name: deep-research-claude
-description: Multi-source citation-backed research reports with credibility scoring via Claude subagent fan-out. For complex analyses, comparisons, and trend reports - not simple lookups.
+description: Claude Code default for any plain "deep research" request. Multi-source citation-backed research reports with credibility scoring via Claude subagent fan-out. Use for complex analyses, comparisons, and trend reports - not simple lookups.
 ---
 
 # Deep Research v3 - Multi-Agent Fan-Out Architecture
@@ -85,7 +85,7 @@ Mode Selection (determines agent count + token budget)
 - Bibliography (COMPLETE - every citation, no placeholders)
 - Methodology Appendix
 
-**Output files (all to `$RESEARCH_DIR/[Topic]_Research_[YYYYMMDD]/`, where `RESEARCH_DIR` defaults to `~/Documents` - override via the `RESEARCH_DIR` env var):**
+**Output files (all to `$RESEARCH_DIR/[yymmdd]_[hhmm]_[Topic]_Research/`, where `RESEARCH_DIR` defaults to `~/Documents` - override via the `RESEARCH_DIR` env var. Folder and report files share a sortable `date +%y%m%d_%H%M` timestamp prefix):**
 - Markdown (primary source)
 - HTML (McKinsey style, auto-opened)
 - PDF (professional print, auto-opened)

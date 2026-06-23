@@ -62,7 +62,7 @@ deep research in ultradeep mode: compare SDET observability across fintech vs bi
 
 ## Output
 
-Reports saved to `~/Documents/[Topic]_Research_[Date]/`:
+Reports saved to `~/Documents/[yymmdd]_[hhmm]_[Topic]_Research/`:
 - Markdown (primary source of truth)
 - HTML (McKinsey-style, auto-opened in browser)
 - PDF (professional print via WeasyPrint)

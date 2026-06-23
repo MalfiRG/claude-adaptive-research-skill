@@ -31,10 +31,12 @@
 ```bash
 # Output dir is set by the calling skill via $RESEARCH_DIR (default ~/Documents)
 : "${RESEARCH_DIR:=$HOME/Documents}"
+STAMP="$(date +%y%m%d_%H%M)"          # sortable timestamp prefix, e.g. 260623_1430
+# folder_name = ${STAMP}_[Topic]_Research
 mkdir -p "$RESEARCH_DIR/[folder_name]"
 
 # Initialize markdown file with frontmatter
-# Path: [folder]/research_report_[YYYYMMDD]_[slug].md
+# Path: [folder]/[STAMP]_[slug].md
 ```
 
 ### Phase 8.2: Section Generation Loop
@@ -93,14 +95,14 @@ Update sources.json after each section. This survives context compaction and ena
 ## File Organization
 
 **1. Create dedicated folder:**
-- Location: `$RESEARCH_DIR/[TopicName]_Research_[YYYYMMDD]/` (default `~/Documents`)
-- Clean topic name (remove special chars, use underscores)
+- Location: `$RESEARCH_DIR/[yymmdd]_[hhmm]_[TopicName]_Research/` (default `~/Documents`)
+- Sortable `date +%y%m%d_%H%M` timestamp prefix, then clean topic name (remove special chars, use underscores)
 
 **2. File naming convention:**
-All files use same base name:
-- `research_report_20251104_topic_slug.md`
-- `research_report_20251104_topic_slug.html`
-- `research_report_20251104_topic_slug.pdf`
+All files use same base name - the timestamp prefix then the topic slug:
+- `260623_1430_topic_slug.md`
+- `260623_1430_topic_slug.html`
+- `260623_1430_topic_slug.pdf`
 
 **3. Also save copy to:** `~/.claude/research_output/` (internal tracking)
 
