@@ -22,13 +22,17 @@ import re
 from pathlib import Path
 from typing import List, Dict, Tuple
 from urllib import request, error
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
+from collections import Counter
 import json
 import time
 from datetime import datetime
 
 class CitationVerifier:
     """Verify citations in research report"""
+
+    DOMAIN_CONCENTRATION_LIMIT = 0.20
+    DOMAIN_CONCENTRATION_MIN_ENTRIES = 5
 
     def __init__(self, report_path: Path, strict_mode: bool = False):
         self.report_path = report_path
@@ -61,8 +65,8 @@ class CitationVerifier:
 
     def extract_bibliography(self) -> List[Dict]:
         """Extract bibliography entries from report"""
-        pattern = r'## Bibliography(.*?)(?=##|\Z)'
-        match = re.search(pattern, self.content, re.DOTALL | re.IGNORECASE)
+        pattern = r'^##\s+Bibliography\s*$(.*?)(?=^##\s|\Z)'
+        match = re.search(pattern, self.content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
 
         if not match:
             self.errors.append("No Bibliography section found")
@@ -81,7 +85,7 @@ class CitationVerifier:
                 continue
 
             # Check if starts with citation number [N]
-            match_num = re.match(r'^\[(\d+)\]\s+(.+)$', line)
+            match_num = re.match(r'^[-*]?\s*\[([^\]]+)\]\s+(.+)$', line)
             if match_num:
                 if current_entry:
                     entries.append(current_entry)
@@ -308,6 +312,37 @@ class CitationVerifier:
 
         return result
 
+    @staticmethod
+    def _registrable_domain(url: str) -> str:
+        host = (urlparse(url).hostname or "").lower()
+        if host.startswith("www."):
+            host = host[4:]
+        return host
+
+    def check_domain_concentration(self, entries: List[Dict]) -> List[str]:
+        """Flag over-reliance on a single source domain.
+
+        Returns a list of issue strings when one domain supplies more than
+        DOMAIN_CONCENTRATION_LIMIT of the cited sources. Field-neutral: it
+        reasons only about URL hostnames, not topic.
+        """
+        domains = [self._registrable_domain(e["url"]) for e in entries if e.get("url")]
+        domains = [d for d in domains if d]
+        if len(domains) < self.DOMAIN_CONCENTRATION_MIN_ENTRIES:
+            return []
+
+        issues = []
+        counts = Counter(domains)
+        for domain, count in counts.most_common():
+            share = count / len(domains)
+            if share > self.DOMAIN_CONCENTRATION_LIMIT:
+                issues.append(
+                    f"Single-domain over-reliance: {domain} supplies "
+                    f"{count}/{len(domains)} sources ({share:.0%}, limit "
+                    f"{self.DOMAIN_CONCENTRATION_LIMIT:.0%})"
+                )
+        return issues
+
     def verify_all(self):
         """Verify all bibliography entries"""
         print(f"\n{'='*60}")
@@ -360,8 +395,20 @@ class CitationVerifier:
                 print(f"  [{r['num']}] {r['issues'][0] if r['issues'] else 'Unknown'}")
             print()
 
+        # Source-diversity check: over-reliance on one domain
+        concentration_issues = self.check_domain_concentration(entries)
+        if concentration_issues:
+            print('SOURCE DIVERSITY:')
+            for issue in concentration_issues:
+                print(f"  - {issue}")
+            print()
+
         # Decision (Enhanced 2025 - includes URL-verified as acceptable)
         total_verified = len(verified) + len(url_verified)
+
+        if concentration_issues and self.strict_mode:
+            print('  STRICT MODE: Failing due to single-domain over-reliance')
+            return False
 
         if suspicious:
             print('WARNING: Suspicious citations detected')

@@ -72,5 +72,39 @@ class TestCitationConsistencyChecks(unittest.TestCase):
         self.assertTrue(any("missing from bibliography" in e.lower() for e in result.errors))
 
 
+class TestSourceFloorAndKeyFormats(unittest.TestCase):
+    def _validator(self, text: str, **kwargs):
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as fh:
+            fh.write(text)
+            tmp = Path(fh.name)
+        try:
+            validator = ReportValidator(tmp, **kwargs)
+            validator.validate()
+            return validator
+        finally:
+            tmp.unlink()
+
+    def test_source_count_below_floor_is_error(self) -> None:
+        bib = "\n".join(f"[{i}] source {i} https://x{i}.com" for i in range(1, 6))
+        validator = self._validator(f"# R\n\n## Bibliography\n{bib}\n", min_sources=10)
+        self.assertTrue(any("below floor" in e for e in validator.result.errors))
+
+    def test_source_count_at_floor_passes_count_check(self) -> None:
+        bib = "\n".join(f"[{i}] source {i} https://x{i}.com" for i in range(1, 13))
+        validator = self._validator(f"# R\n\n## Bibliography\n{bib}\n", min_sources=10)
+        self.assertFalse(any("below floor" in e for e in validator.result.errors))
+
+    def test_prefixed_and_list_marker_bibliography_entries_counted(self) -> None:
+        bib = "- [GPU-1] alpha https://a.com\n- [COST-2] beta https://b.com\n[S3] gamma https://c.com"
+        validator = self._validator(f"# R\n\nUses [GPU-1] and [S3].\n\n## Bibliography\n{bib}\n", min_sources=3)
+        self.assertFalse(any("below floor" in e for e in validator.result.errors))
+        self.assertFalse(any("No bibliography entries" in e for e in validator.result.errors))
+
+    def test_comma_grouped_body_keys_resolve_against_bibliography(self) -> None:
+        bib = "- [GPU-1] alpha https://a.com\n- [GPU-2] beta https://b.com"
+        validator = self._validator(f"# R\n\nClaim [GPU-1, GPU-2].\n\n## Bibliography\n{bib}\n", min_sources=2)
+        self.assertFalse(any("missing from bibliography" in e.lower() for e in validator.result.errors))
+
+
 if __name__ == "__main__":
     unittest.main()

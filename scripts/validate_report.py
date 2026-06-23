@@ -25,9 +25,13 @@ PLACEHOLDER_PATTERN = re.compile(
     r"\b(TBD|TODO|FIXME|placeholder|additional sources|content continues|etc\.)\b",
     re.IGNORECASE,
 )
-CITATION_PATTERN = re.compile(r"\[(\d+)\]")
+CITATION_PATTERN = re.compile(r"\[([A-Za-z]{0,12}[-_ ]?\d+)\]")
 CITATION_RANGE_PATTERN = re.compile(r"\[\d+\s*-\s*\d+\]")
+BIBLIOGRAPHY_ENTRY_PATTERN = re.compile(r"^[-*]?\s*\[([^\]]+)\]\s+\S", re.MULTILINE)
+BODY_KEY_PATTERN = re.compile(r"[A-Za-z]{0,12}[-_ ]?\d+[A-Za-z]?")
 HEADING_PATTERN = re.compile(r"^##+\s+(.+?)\s*$", re.MULTILINE)
+
+DEFAULT_MIN_SOURCES = 10
 
 
 @dataclass
@@ -54,9 +58,10 @@ class ValidationResult:
 class ReportValidator:
     """Validate one Markdown research report."""
 
-    def __init__(self, report_path: Path) -> None:
+    def __init__(self, report_path: Path, min_sources: int = DEFAULT_MIN_SOURCES) -> None:
         self.report_path = report_path
         self.content = report_path.read_text(encoding="utf-8")
+        self.min_sources = min_sources
         self.result = ValidationResult()
 
     def validate(self) -> ValidationResult:
@@ -84,26 +89,40 @@ class ReportValidator:
             self.result.add_error("Citation range found. Use individual citations instead.")
 
         body, bibliography = self._split_bibliography()
-        body_citations = set(CITATION_PATTERN.findall(body))
+        body_citations = self._body_citation_keys(body)
         bibliography_citations = set(
-            match.group(1)
-            for match in re.finditer(r"^\[(\d+)\]\s+.+$", bibliography, re.MULTILINE)
+            match.group(1).strip()
+            for match in BIBLIOGRAPHY_ENTRY_PATTERN.finditer(bibliography)
         )
 
         if not bibliography_citations:
             self.result.add_error("No bibliography entries found")
             return
 
-        missing = sorted(body_citations - bibliography_citations, key=int)
+        missing = sorted(body_citations - bibliography_citations)
         if missing:
             self.result.add_error(f"Citations missing from bibliography: {', '.join(missing)}")
 
-        unused = sorted(bibliography_citations - body_citations, key=int)
+        unused = sorted(bibliography_citations - body_citations)
         if unused:
             self.result.add_warning(f"Bibliography entries not cited in body: {', '.join(unused)}")
 
-        if len(bibliography_citations) < 10:
-            self.result.add_warning(f"Source count below baseline target: {len(bibliography_citations)}")
+        source_count = len(bibliography_citations)
+        if source_count < self.min_sources:
+            self.result.add_error(
+                f"Source count {source_count} below floor of {self.min_sources} "
+                "for the selected mode"
+            )
+
+    @staticmethod
+    def _body_citation_keys(body: str) -> set[str]:
+        keys: set[str] = set()
+        for span in re.findall(r"\[([^\]]+)\]", body):
+            for token in span.split(","):
+                token = token.strip()
+                if BODY_KEY_PATTERN.fullmatch(token):
+                    keys.add(token)
+        return keys
 
     def _check_summary_length(self) -> None:
         summary = self._section_text("Executive Summary")
@@ -139,6 +158,16 @@ def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Validate a deep-research Markdown report")
     parser.add_argument("--report", "-r", required=True, type=Path, help="Report path")
+    parser.add_argument(
+        "--min-sources",
+        type=int,
+        default=DEFAULT_MIN_SOURCES,
+        help=(
+            "Minimum distinct bibliography sources required (mode floor: "
+            "Quick 10, Standard 25, Deep 50, UltraDeep 80). Below this is a "
+            "blocking error."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -157,7 +186,7 @@ def main() -> int:
         return 1
 
     try:
-        validator = ReportValidator(args.report)
+        validator = ReportValidator(args.report, min_sources=args.min_sources)
     except OSError as exc:
         LOGGER.error("ERROR: Cannot read report: %s", exc)
         return 1

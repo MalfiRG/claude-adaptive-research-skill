@@ -48,7 +48,7 @@ Mode Selection (determines agent count + token budget)
 | 4 | TRIANGULATE | - | Y | Y | Y |
 | 4.5 | OUTLINE REFINEMENT | - | Y | Y | Y |
 | 5 | SYNTHESIZE | - | Y | Y | Y |
-| 6 | CRITIQUE | - | - | Y | Y |
+| 6 | CRITIQUE | - | Lite | Y | Y |
 | 7 | REFINE | - | - | Y | Y |
 | 8 | PACKAGE | Y | Y | Y | Y |
 
@@ -69,7 +69,8 @@ Mode Selection (determines agent count + token budget)
 - HTML styling: [mckinsey_report_template.html](./templates/mckinsey_report_template.html)
 
 **Post-production validation:**
-- `python scripts/verify_citations.py --report [path]` (URL accessibility + DOI resolution + hallucination detection)
+- `python scripts/validate_report.py --report [path] --min-sources <floor>` (structure + source-count floor; floor = Quick 10 / Standard 25 / Deep 50 / UltraDeep 80)
+- `python scripts/verify_citations.py --report [path]` (URL accessibility + DOI resolution + hallucination detection + single-domain over-reliance)
 
 ---
 

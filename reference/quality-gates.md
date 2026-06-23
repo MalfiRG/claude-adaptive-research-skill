@@ -12,23 +12,26 @@ python scripts/verify_citations.py --report [path]
 - DOI resolution (verifies citation exists)
 - Title/year matching (detects mismatched metadata)
 - Flags suspicious entries (recent year without DOI, no URL, failed verification)
+- Source-diversity: warns when any single domain supplies >20% of cited sources (`--strict` fails). Concentration on a primary/authoritative domain (vendor spec page, standards body, model card host) is acceptable - the smell is concentration on secondary summary sites. Judge by tier, not raw share.
 
 **On suspicious citations:** Review flagged, remove/replace fabricated, re-run until clean.
 
 ### Structure & Quality Validation
 
 ```bash
-python scripts/validate_report.py --report [path]
+python scripts/validate_report.py --report [path] --min-sources <mode-floor>
 ```
 
-**9 automated checks:**
+Pass `--min-sources` matching the selected mode: **Quick 10, Standard 25, Deep 50, UltraDeep 80**. A source count below the floor is a blocking error, not a warning. Omitting the flag falls back to a floor of 10.
+
+**Automated checks:**
 1. Executive summary length (200-400 words)
 2. Required sections present
-3. Citations formatted [1], [2], [3]
-4. Bibliography matches citations
+3. Citations recognized in any key format - numeric `[1]`, prefixed `[S1]`, or namespaced `[GPU-1]`; comma-grouped `[GPU-1, GPU-2]` and list-marker bibliography entries (`- [GPU-1] ...`) supported
+4. Bibliography matches citations (body keys resolve to entries and vice versa)
 5. No placeholder text (TBD, TODO)
 6. Word count reasonable (500-10000)
-7. Minimum 10 sources
+7. Source count at or above the mode floor (`--min-sources`)
 8. No broken internal links
 
 **Failure handling:**
@@ -140,6 +143,33 @@ Before considering section complete:
 
 ---
 
+## Source Tier Preference
+
+Prefer **primary artifacts** over secondary summaries for any quantitative or definitional claim. This holds across every discipline:
+
+| Tier | Examples (domain-neutral) |
+|------|---------------------------|
+| Primary (prefer) | Vendor/standards spec sheets, official documentation, peer-reviewed papers, raw config/data/source files, primary datasets, regulatory filings, court records, original measurements |
+| Secondary (use to contextualize) | Review articles, textbooks, reputable journalism that cites primaries |
+| Tertiary (avoid as the cited source) | SEO blog roundups, content-farm "best X in YEAR" pages, AI-generated summaries, unsourced aggregators |
+
+**Rules:**
+- Any **quantitative or definitional** claim (a spec value, a constant, a measured result, a formal definition) cites the **primary artifact** - e.g. the actual config/spec/dataset/paper - not a blog that restates it. If only a secondary source is available, cite it AND mark the claim for primary-source follow-up.
+- When a secondary source asserts a number, attempt to trace it to its primary before citing. Cite the primary if found.
+- Tertiary sources may motivate a search but should not be the load-bearing citation for any factual claim.
+
+## Empirically-Checkable Claims
+
+Where a key claim is **empirically verifiable**, state the concrete check that would confirm or refute it - the measurement, query, calculation, experiment, or observation a reader could run. Domain-neutral: a VRAM budget states the load-and-measure test; a performance claim states the benchmark; a market-size figure states the dataset and filter; a derivation states the inputs. This converts assertions into falsifiable, reproducible findings.
+
+## Weak-Claim Containment
+
+A claim the report itself flags as weak, single-source, unverified, or "weakest-sourced" MUST NOT appear inside Recommendations or be stated as actionable fact. Resolve it one of two ways before delivery:
+1. Repair it with one additional targeted search that raises it to the 3-independent-source standard, or
+2. Demote it to the Limitations & Caveats section, explicitly labeled.
+
+Self-flagged uncertainty in a recommendation is a defect, not honesty - move the hedge out of the action item.
+
 ## Anti-Hallucination Protocol
 
 - **Source grounding:** Every factual claim MUST cite specific source immediately [N]
@@ -154,8 +184,9 @@ Before considering section complete:
 ## Report Quality Standards
 
 **Every report must have:**
-- 10+ sources (document if fewer)
+- Sources at or above the mode floor (Quick 10, Standard 25, Deep 50, UltraDeep 80); below-floor is a blocking error, not a footnote
 - 3+ sources per major claim
+- Primary-tier citation for every quantitative/definitional claim (see Source Tier Preference)
 - Executive summary 200-400 words
 - Full citations with URLs
 - Credibility assessment

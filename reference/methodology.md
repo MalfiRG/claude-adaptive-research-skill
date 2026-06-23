@@ -92,6 +92,7 @@ This is the LOAD-BEARING phase. Fan-out without specific briefs = same duplicati
 2. **Collectively exhaustive:** The union of all sub-questions must fully cover the original research question.
 3. **Independently answerable:** Each sub-question can be researched without results from other agents.
 4. **Appropriately scoped:** Each should need 5-15 tool calls to answer well.
+5. **Decision-axis coverage:** The sub-questions must collectively cover every decision-relevant axis the query implies. In particular, if the user named a specific candidate, option, hypothesis, or tool, allocate a sub-question to it AND a sub-question to its principal alternatives - never evaluate the named option in isolation. Also cover the dominant trade-off axis of the domain (whatever the question actually turns on: cost, accuracy, latency, risk, reproducibility, feasibility, etc.). This rule is domain-neutral - it applies whether the query is a hardware choice, an algorithm comparison, a scientific question, or a market analysis. A report that answers only the named option without its alternatives and trade-off axis is under-decomposed.
 
 ### Agent Brief Template (6 Components - ALL REQUIRED)
 
@@ -435,9 +436,15 @@ If critique identifies a critical knowledge gap (not just a writing issue), spaw
 
 ### Standard Mode (DEFAULT)
 - 3-5 agents, lead never searches
-- Full Phase 1-5 + 8
-- Skip Phases 6, 7
+- Full Phase 1-5 + **Phase 6-Lite** + 8
+- Skip the full Phase 6 persona panel and Phase 7 refine loop
 - Target: 25+ sources, 5-10 minutes
+
+**Phase 6-Lite (Standard-mode critique gate, mandatory):** A single self-critique pass by the lead before packaging - no persona panel, no automatic agent fan-out. Run this checklist and fix in place:
+1. **Decision-axis coverage:** Does the report cover the named option AND its principal alternatives AND the dominant trade-off axis (per Phase 2.5 rule 5)? If an axis is missing, spawn ONE narrow follow-up agent (time-box 3-5 tool calls) to fill it.
+2. **Weak-claim containment:** Scan for any claim flagged weak/single-source/unverified. Each must be repaired with one targeted search or demoted to Limitations - never left inside Recommendations (see quality-gates.md).
+3. **Primary-tier check:** Every quantitative/definitional claim cites a primary artifact, not a secondary summary. Re-source the worst offenders.
+This gate is what separates a broad-but-soft Standard report from a defensible one; do not skip it.
 
 ### Deep Mode
 - 5-8 agents, lead never searches
